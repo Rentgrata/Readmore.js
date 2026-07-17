@@ -1,0 +1,61 @@
+# .github/workflows/semgrep.yml
+#
+# Static Application Security Testing (SAST) via Semgrep.
+# Runs on every pull request to the production branch, before merge.
+# Free: uses public Semgrep registry rulesets, no account or token required.
+#
+# The status check this produces is named:  semgrep-scan
+# Put that exact name into Secureframe > Asset Inventory > Repositories >
+# "Static code analysis test names" for each in-scope repo.
+
+name: semgrep
+
+on:
+  pull_request:
+    branches: [main, master, development]   # covers repos whose default is development
+
+permissions:
+  contents: read
+
+jobs:
+  semgrep-scan:
+    name: semgrep-scan
+    runs-on: ubuntu-latest
+    # Dependabot PRs run with restricted permissions; skip to avoid noise.
+    if: github.actor != 'dependabot[bot]'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Semgrep
+        run: pip install --quiet semgrep
+
+      - name: Run Semgrep SAST
+        run: |
+          semgrep scan \
+            --config p/default \
+            --config p/security-audit \
+            --config p/secrets \
+            --sarif --output semgrep.sarif \
+            --metrics off \
+          || true
+          # REPORT MODE (current): the "|| true" makes the check pass even when
+          # findings exist, so you don't block every PR on day one while the
+          # team triages the baseline. SAST still runs on every PR = control met.
+          #
+          # TO ENFORCE (block merges on findings): delete the "|| true" line
+          # above. The check will then fail when Semgrep finds an issue, and
+          # if it's a required status check, the PR can't merge until resolved.
+
+      - name: Upload SARIF as evidence artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-sarif
+          path: semgrep.sarif
+          if-no-files-found: ignore
