@@ -187,3 +187,7 @@ Which will install the necessary development dependencies. Then, to build the mi
 $ npm run build
 ```
 
+<!-- soc2-sast -->
+## Security
+
+Static application security testing (SAST) runs automatically on all pull requests via Semgrep before merge. See `.github/workflows/semgrep.yml`.
